@@ -17,7 +17,7 @@ kontraktor manpower supply.
 | Karyawan | Master data lengkap (pribadi, kontrak PKWT/Harian, klasifikasi, area, regu, BPJS, NPWP/PTKP, rekening, APD, MCU, sertifikat, dokumen), riwayat gaji & klasifikasi otomatis, kartu ringkasan, histogram manpower 12 bulan, filter/sort/cari, export Excel/PDF, **import Excel** dengan template & laporan baris gagal. |
 | Klasifikasi & rate | Rate tagihan per jam dengan **tanggal efektif** (adendum), histori tersimpan. |
 | Absensi & lembur | Input harian per regu dari HP (pilih regu → status → jam → simpan), hitung otomatis jam normal / lembur aktual / **jam konversi** di database, peringatan batas PP 35/2021, approval & penguncian, rekap per karyawan/klasifikasi/regu/area, Top 10, tren harian & mingguan, kalender absensi berwarna. |
-| Payroll | Prorata (hari kalender/30 atau hari kerja), tunjangan tetap/tidak tetap (bulanan/harian), upah lembur, BPJS (Kes, JKK, JKM, JHT, JP + batas upah), cadangan THR & kompensasi PKWT, PPh 21 (manual; ditanggung/dipotong), potongan kasbon, **kunci periode = snapshot**, slip gaji PDF, export Excel + daftar transfer bank. |
+| Payroll | Prorata (hari kalender/30 atau hari kerja), tunjangan tetap/tidak tetap (bulanan/harian), upah lembur, BPJS (Kes, JKK, JKM, JHT, JP + batas upah), cadangan THR & kompensasi PKWT, **PPh 21 otomatis tarif TER** (dipotong / ditanggung / gross-up), potongan kasbon, **kunci periode = snapshot**, slip gaji PDF, export Excel + daftar transfer bank. |
 | Cost operasional | Biaya tenaga kerja otomatis dari payroll + biaya non-gaji manual (kategori bisa ditambah, upload foto nota dari HP), donat komposisi, tren, cost/karyawan, cost/jam, **budget vs aktual**. |
 | Invoice | Man-hour: Σ **jam aktual** × rate klasifikasi yang berlaku pada tanggal kerja, hanya timesheet approved; PPN (DPP nilai lain) & PPh 23; status Draft → Terkirim → Disetujui → Dibayar sebagian → Lunas; pembayaran otomatis masuk arus kas; lampiran per klasifikasi & per karyawan (Excel/PDF); pencegahan tagihan ganda. |
 | Profit | Laba-rugi bulanan & kumulatif, **margin per klasifikasi** (tagihan jam aktual vs biaya dengan jam konversi), alert bila di bawah target. |
@@ -65,6 +65,18 @@ Contoh spesifikasi 5.5 diuji otomatis (`npm test` dan `npm run test:db`):
 | --- | --- | --- | --- |
 | Rabu 07:00–19:00, istirahat 1 jam | 11 | 1,5 + 2 + 2 = **5,5** | **Rp 158.960** |
 | Sabtu 10 jam | 10 | 8×2 + 1×3 + 1×4 = **23** | **Rp 664.740** |
+
+### PPh 21 (PP 58/2023, PMK 168/2023)
+
+- Mode di *Pengaturan → Payroll*: tidak dihitung · dipotong dari karyawan · ditanggung perusahaan · gross-up (tunjangan PPh).
+- **Bruto** = gaji + tunjangan + upah lembur (+ tunjangan PPh bila gross-up) + premi BPJS Kesehatan, JKK & JKM yang dibayar perusahaan.
+- **Januari–November**: TER bulanan × bruto. Kategori dari status PTKP karyawan: A = TK/0, TK/1, K/0 · B = TK/2, TK/3, K/1, K/2 · C = K/3 (kosong = TK/0).
+- **Desember atau bulan terakhir bekerja** (pegawai tetap/PKWT): bruto setahun − biaya jabatan (5%, maks. Rp 500.000 × jumlah bulan) − iuran JHT & JP karyawan − PTKP →
+  PKP (dibulatkan ribuan) × tarif Pasal 17 (5/15/25/30/35%), dikurangi PPh yang sudah dipotong Jan–Nov. Hasil negatif = lebih potong, dikembalikan ke karyawan.
+- Karyawan kontrak **Harian** diperlakukan sebagai pegawai tidak tetap yang dibayar bulanan: TER bulanan tanpa perhitungan setahun.
+- Rincian (metode, kategori, tarif TER, perhitungan setahun) disimpan di snapshot payroll (`detail.pph21`) dan tampil di slip gaji.
+- Belum dicakup: tarif 20% lebih tinggi bagi yang tidak memiliki NPWP/NIK terintegrasi, TER harian, dan penghasilan dari pemberi kerja lain dalam tahun yang sama.
+  **Verifikasi tabel TER dengan lampiran PP 58/2023 sebelum dipakai produksi**; tabel dapat diperbarui di pengaturan `pph21`.
 
 Jam dihitung oleh **trigger PostgreSQL** (`app.timesheet_before`) sehingga tidak bisa dimanipulasi dari API; kode
 TypeScript (`src/lib/calc`) memakai rumus yang sama untuk pratinjau di form & perhitungan payroll.
@@ -149,7 +161,6 @@ di kemudian hari tidak mengubah laporan periode yang sudah dikunci.
 ## 6. Catatan operasional
 
 - **Import besar**: import ±200 baris per file bila sekaligus membuat akun login (pembuatan akun dilakukan per baris).
-- **PPh 21** diinput manual per karyawan per periode (mode ditanggung/dipotong diatur di Pengaturan) — tarif TER PP 58/2023 belum diotomatisasi.
 - **Offline mode** (fase 2) belum tersedia; service worker saat ini hanya meng-cache aset agar aplikasi cepat terbuka.
 - **Backup mandiri** (opsional, di luar backup Supabase): `pg_dump "$SUPABASE_DB_URL" -Fc -f backup-$(date +%F).dump` terjadwal harian.
 - Mesin absensi fingerprint: belum terintegrasi; data dapat dimasukkan lewat input massal per regu.

@@ -1,6 +1,7 @@
 "use client";
 import { Download } from "lucide-react";
 import { slipGajiPdf, type SlipData } from "@/lib/export";
+import { labelPph21 } from "@/lib/pph21-label";
 
 export interface PayrollRow {
   gaji_pokok: number;
@@ -9,6 +10,7 @@ export interface PayrollRow {
   upah_lembur: number;
   bpjs_karyawan: { kes?: number; jht?: number; jp?: number };
   pph21: number;
+  tunjangan_pph?: number;
   potongan_lain: number;
   potongan_keterangan?: string | null;
   take_home_pay: number;
@@ -17,7 +19,7 @@ export interface PayrollRow {
   jam_lembur: number;
   jam_konversi: number;
   upah_per_jam: number;
-  detail?: { pph21_mode?: string };
+  detail?: { pph21_mode?: string; pph21?: { metode?: string; tarif_ter?: number | null; status_ptkp?: string } | null };
 }
 
 export function toSlip(p: PayrollRow, meta: { perusahaan: string; periode: string; nama: string; nik: string; klasifikasi: string; rekening: string }): SlipData {
@@ -27,7 +29,8 @@ export function toSlip(p: PayrollRow, meta: { perusahaan: string; periode: strin
     ["BPJS JHT (2%)", n(p.bpjs_karyawan?.jht)],
     ["BPJS JP (1%)", n(p.bpjs_karyawan?.jp)],
   ];
-  if (p.detail?.pph21_mode === "dipotong_karyawan" && n(p.pph21)) potongan.push(["PPh 21", n(p.pph21)]);
+  const mode = p.detail?.pph21_mode;
+  if ((mode === "dipotong_karyawan" || mode === "gross_up") && n(p.pph21)) potongan.push([labelPph21(p), n(p.pph21)]);
   if (n(p.potongan_lain)) potongan.push([p.potongan_keterangan || "Potongan lain (kasbon, dll.)", n(p.potongan_lain)]);
   return {
     ...meta,
@@ -41,6 +44,7 @@ export function toSlip(p: PayrollRow, meta: { perusahaan: string; periode: strin
       ["Tunjangan tetap", n(p.tunjangan_tetap)],
       ["Tunjangan tidak tetap", n(p.tunjangan_tidak_tetap)],
       [`Upah lembur (${n(p.jam_konversi)} jam konversi)`, n(p.upah_lembur)],
+      ...(n(p.tunjangan_pph) ? [["Tunjangan PPh 21", n(p.tunjangan_pph)] as [string, number]] : []),
     ],
     potongan,
     take_home_pay: n(p.take_home_pay),

@@ -86,7 +86,12 @@ export async function EmployeeForm({ emp, comp, allowances }: { emp?: any; comp?
             </select>
           </Field>
           <T name="gaji_pokok" label="Gaji / upah pokok (Rp)" type="number" d={comp} />
-          <T name="status_ptkp" label="Status PTKP (TK/0, K/1, …)" d={comp} />
+          <Field label="Status PTKP (kategori TER PPh 21)">
+            <select name="status_ptkp" defaultValue={comp?.status_ptkp ?? ""} className="input">
+              <option value="">- (dianggap TK/0)</option>
+              {["TK/0", "TK/1", "TK/2", "TK/3", "K/0", "K/1", "K/2", "K/3"].map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </Field>
           <T name="npwp" label="NPWP" d={comp} />
           <T name="bank_nama" label="Bank" d={comp} />
           <T name="no_rekening" label="No. rekening" d={comp} />

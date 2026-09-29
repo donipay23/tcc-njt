@@ -1,5 +1,6 @@
 import { dayOfWeek, round2, upahLembur, upahPerJam, type KomponenUpah, type TipeHari } from "./overtime";
 import type { AppSettings } from "./settings";
+import { hitungPph21, hitungPph21GrossUp, type Pph21Input, type Pph21Result } from "./pph21";
 
 export type BasisGaji = "bulanan" | "harian";
 
@@ -51,7 +52,8 @@ export interface PayrollInput {
   basis_gaji: BasisGaji;
   tunjangan: Tunjangan[];
   rekap: RekapJam;
-  pph21?: number;
+  /** Data PPh 21. Wajib bila pph21_mode ≠ "tidak_dihitung". */
+  pajak?: Omit<Pph21Input, "bruto" | "iuran_pegawai">;
   potongan_lain?: number;
 }
 
@@ -108,7 +110,13 @@ export interface PayrollResult {
   bpjs_karyawan: { kes: number; jht: number; jp: number; total: number };
   thr_cadangan: number;
   kompensasi_cadangan: number;
+  /** Penghasilan bruto untuk PPh 21 (termasuk premi JKK, JKM, BPJS Kes dibayar perusahaan). */
+  bruto_pph21: number;
+  /** Iuran JHT + JP pegawai (pengurang PPh 21 setahun). */
+  iuran_pegawai_pph21: number;
+  tunjangan_pph: number;
   pph21: number;
+  pph21_detail: Pph21Result | null;
   potongan_lain: number;
   take_home_pay: number;
   biaya_perusahaan: number;
@@ -165,12 +173,35 @@ export function hitungPayroll(input: PayrollInput, s: AppSettings): PayrollResul
   const thr_cadangan = s.payroll.thr_cadangan ? rp(upahTetapPeriode / 12) : 0;
   const kompensasi_cadangan = s.payroll.kompensasi_pkwt_cadangan ? rp(upahTetapPeriode / 12) : 0;
 
-  const pph21 = s.payroll.pph21_mode === "tidak_dihitung" ? 0 : rp(input.pph21 ?? 0);
+  // PPh 21 (TER / Pasal 17 setahun di masa terakhir)
+  const mode = s.payroll.pph21_mode;
+  const iuran_pegawai_pph21 = bk.jht + bk.jp;
+  const brutoPajak = bruto + bp.kes + bp.jkk + bp.jkm;
+  let pph21 = 0;
+  let tunjangan_pph = 0;
+  let pph21_detail: Pph21Result | null = null;
+  if (mode !== "tidak_dihitung") {
+    const pj: Pph21Input = {
+      ...(input.pajak ?? { status_ptkp: null, pegawai_tetap: true, masa_terakhir: false }),
+      bruto: brutoPajak,
+      iuran_pegawai: iuran_pegawai_pph21,
+    };
+    if (mode === "gross_up") {
+      const { tunjangan_pph: t, ...rest } = hitungPph21GrossUp(pj, s.pph21);
+      tunjangan_pph = t;
+      pph21_detail = rest;
+    } else {
+      pph21_detail = hitungPph21(pj, s.pph21);
+    }
+    pph21 = pph21_detail.pph21;
+  }
+  const bruto_pph21 = brutoPajak + tunjangan_pph;
   const potongan_lain = rp(input.potongan_lain ?? 0);
 
-  const take_home_pay = bruto - bk.total - (s.payroll.pph21_mode === "dipotong_karyawan" ? pph21 : 0) - potongan_lain;
+  const dipotong = mode === "dipotong_karyawan" || mode === "gross_up";
+  const take_home_pay = bruto + tunjangan_pph - bk.total - (dipotong ? pph21 : 0) - potongan_lain;
   const biaya_perusahaan =
-    bruto + bp.total + thr_cadangan + kompensasi_cadangan + (s.payroll.pph21_mode === "ditanggung_perusahaan" ? pph21 : 0);
+    bruto + tunjangan_pph + bp.total + thr_cadangan + kompensasi_cadangan + (mode === "ditanggung_perusahaan" ? pph21 : 0);
 
   return {
     hari_hadir,
@@ -190,7 +221,11 @@ export function hitungPayroll(input: PayrollInput, s: AppSettings): PayrollResul
     bpjs_karyawan: bk,
     thr_cadangan,
     kompensasi_cadangan,
+    bruto_pph21,
+    iuran_pegawai_pph21,
+    tunjangan_pph,
     pph21,
+    pph21_detail,
     potongan_lain,
     take_home_pay,
     biaya_perusahaan,
