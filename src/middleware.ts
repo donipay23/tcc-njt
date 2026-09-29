@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { LOGIN_AT_COOKIE, SESSION_HOURS } from "@/lib/session-const";
 
-const PUBLIC_PATHS = ["/login", "/lupa-password", "/auth/callback", "/manifest.webmanifest", "/sw.js", "/icons"];
+const PUBLIC_PATHS = ["/login", "/lupa-password", "/auth/callback", "/manifest.webmanifest", "/sw.js", "/icons", "/offline.html"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

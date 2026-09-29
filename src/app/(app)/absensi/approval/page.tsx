@@ -3,7 +3,7 @@ import { getPerusahaan, requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getMasters } from "@/lib/masters";
 import { rentangDariParams } from "@/lib/periode";
-import { angka, tanggal } from "@/lib/format";
+import { angka, tanggal, tanggalWaktu } from "@/lib/format";
 import { STATUS_APPROVAL, STATUS_KEHADIRAN } from "@/lib/types";
 import { Badge, Card, Field, Flash, Kpi, PageHeader, toneStatus } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
@@ -41,7 +41,7 @@ export default async function Approval({ searchParams }: { searchParams: Promise
 
   let q = supabase
     .from("timesheets")
-    .select("id, tanggal, status_kehadiran, jam_masuk, jam_keluar, jam_aktual, jam_normal, jam_lembur, jam_konversi, tipe_hari, peringatan, approval_status, keterangan, employees(nik, nama, team_id)")
+    .select("id, tanggal, status_kehadiran, jam_masuk, jam_keluar, jam_aktual, jam_normal, jam_lembur, jam_konversi, tipe_hari, peringatan, approval_status, keterangan, offline_dicatat_pada, employees(nik, nama, team_id)")
     .gte("tanggal", mulai)
     .lte("tanggal", selesai)
     .order("tanggal")
@@ -139,7 +139,10 @@ export default async function Approval({ searchParams }: { searchParams: Promise
                       <td className="td">
                         {r.approval_status !== "approved" && <input type="checkbox" name="ids" value={r.id} defaultChecked={r.approval_status === "submitted" && !r.peringatan?.length} className="h-4 w-4" />}
                       </td>
-                      <td className="td">{tanggal(r.tanggal)} {r.tipe_hari === "libur" && <Badge tone="purple">Libur</Badge>}</td>
+                      <td className="td">
+                        {tanggal(r.tanggal)} {r.tipe_hari === "libur" && <Badge tone="purple">Libur</Badge>}
+                        {r.offline_dicatat_pada && <div className="text-xs text-gray-500" title="Diinput tanpa sinyal, disinkron kemudian">offline · {tanggalWaktu(r.offline_dicatat_pada)}</div>}
+                      </td>
                       <td className="td">{r.employees?.nama}<div className="text-xs text-gray-500">{r.employees?.nik}</div></td>
                       <td className="td">{m.tName.get(r.employees?.team_id) ?? "-"}</td>
                       <td className="td"><Badge tone={toneStatus(r.status_kehadiran)}>{STATUS_KEHADIRAN[r.status_kehadiran]}</Badge></td>

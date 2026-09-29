@@ -12,12 +12,14 @@ export interface AbsensiRow {
   jam_keluar: string | null;
   lokasi: string | null;
   keterangan: string | null;
+  /** Diisi bila data diinput saat offline lalu disinkron (waktu input di HP, ISO). */
+  dicatat_pada?: string | null;
 }
 
 const STATUS = ["hadir", "sakit", "izin", "alpa", "cuti", "libur"];
 const TIME = /^\d{2}:\d{2}$/;
 
-export async function simpanAbsensi(tanggal: string, rows: AbsensiRow[]): Promise<{ ok: number; error?: string; dilewati: number }> {
+export async function simpanAbsensi(tanggal: string, rows: AbsensiRow[]): Promise<{ ok: number; error?: string; dilewati: number; dilewati_ids?: string[] }> {
   await requireRole("super_admin", "admin", "supervisor");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) return { ok: 0, dilewati: 0, error: "Tanggal tidak valid" };
   const supabase = await createClient();
@@ -37,13 +39,15 @@ export async function simpanAbsensi(tanggal: string, rows: AbsensiRow[]): Promis
         lokasi: r.lokasi?.slice(0, 200) || null,
         keterangan: r.keterangan?.slice(0, 500) || null,
         approval_status: "submitted",
+        offline_dicatat_pada: r.dicatat_pada && !isNaN(Date.parse(r.dicatat_pada)) ? r.dicatat_pada : null,
       };
     });
-  if (!payload.length) return { ok: 0, dilewati: skip.size };
+  const dilewati_ids = [...skip];
+  if (!payload.length) return { ok: 0, dilewati: skip.size, dilewati_ids };
   const { error } = await supabase.from("timesheets").upsert(payload, { onConflict: "employee_id,tanggal" });
-  if (error) return { ok: 0, dilewati: skip.size, error: error.message };
+  if (error) return { ok: 0, dilewati: skip.size, dilewati_ids, error: error.message };
   revalidatePath("/absensi");
-  return { ok: payload.length, dilewati: skip.size };
+  return { ok: payload.length, dilewati: skip.size, dilewati_ids };
 }
 
 export async function hapusAbsensi(employeeId: string, tanggal: string) {
