@@ -21,13 +21,36 @@ export interface HariTimesheet {
   jam_konversi: number;
 }
 
+/** Rekap jam per karyawan per periode (hasil RPC `rekap_timesheet` atau `rekapDariHari`). */
+export interface RekapJam {
+  hari_hadir: number;
+  hari_hadir_kerja: number;
+  jam_aktual: number;
+  jam_normal: number;
+  jam_lembur: number;
+  jam_konversi: number;
+}
+
+export function rekapDariHari(hari: HariTimesheet[]): RekapJam {
+  const hadir = hari.filter((h) => h.status_kehadiran === "hadir" && h.jam_aktual > 0);
+  const sum = (k: keyof HariTimesheet) => round2(hari.reduce((a, h) => a + (Number(h[k]) || 0), 0));
+  return {
+    hari_hadir: hadir.length,
+    hari_hadir_kerja: hadir.filter((h) => h.tipe_hari === "kerja").length,
+    jam_aktual: sum("jam_aktual"),
+    jam_normal: sum("jam_normal"),
+    jam_lembur: sum("jam_lembur"),
+    jam_konversi: sum("jam_konversi"),
+  };
+}
+
 export interface PayrollInput {
   periode: { mulai: string; selesai: string };
   karyawan: { tanggal_masuk: string; tanggal_keluar?: string | null };
   gaji_pokok: number;
   basis_gaji: BasisGaji;
   tunjangan: Tunjangan[];
-  hari: HariTimesheet[];
+  rekap: RekapJam;
   pph21?: number;
   potongan_lain?: number;
 }
@@ -92,10 +115,8 @@ export interface PayrollResult {
 }
 
 export function hitungPayroll(input: PayrollInput, s: AppSettings): PayrollResult {
-  const hadir = input.hari.filter((h) => h.status_kehadiran === "hadir" && h.jam_aktual > 0);
-  const hari_hadir = hadir.length;
-  const sum = (k: keyof HariTimesheet) => round2(input.hari.reduce((a, h) => a + (Number(h[k]) || 0), 0));
-  const jam_konversi = sum("jam_konversi");
+  const { hari_hadir, hari_hadir_kerja: hadirHariKerja } = input.rekap;
+  const jam_konversi = round2(Number(input.rekap.jam_konversi));
 
   const ttBulanan = input.tunjangan.filter((t) => t.jenis === "tetap" && t.basis === "bulanan").reduce((a, t) => a + t.jumlah, 0);
   const ttHarian = input.tunjangan.filter((t) => t.jenis === "tetap" && t.basis === "harian").reduce((a, t) => a + t.jumlah, 0);
@@ -111,8 +132,7 @@ export function hitungPayroll(input: PayrollInput, s: AppSettings): PayrollResul
   };
 
   const faktor = input.basis_gaji === "harian" ? 1 : faktorProrata(input, s);
-  // Hari hadir pada hari kerja (untuk upah harian; hari libur dibayar lewat lembur)
-  const hadirHariKerja = hadir.filter((h) => h.tipe_hari === "kerja").length;
+  // Upah harian dibayar per hari hadir di hari kerja; hari libur dibayar lewat lembur
 
   const gaji_pokok = rp(input.basis_gaji === "harian" ? input.gaji_pokok * hadirHariKerja : input.gaji_pokok * faktor);
   const tunjangan_tetap = rp(ttBulanan * faktor + ttHarian * hari_hadir);
@@ -154,9 +174,9 @@ export function hitungPayroll(input: PayrollInput, s: AppSettings): PayrollResul
 
   return {
     hari_hadir,
-    jam_aktual: sum("jam_aktual"),
-    jam_normal: sum("jam_normal"),
-    jam_lembur: sum("jam_lembur"),
+    jam_aktual: round2(Number(input.rekap.jam_aktual)),
+    jam_normal: round2(Number(input.rekap.jam_normal)),
+    jam_lembur: round2(Number(input.rekap.jam_lembur)),
     jam_konversi,
     faktor_prorata: round2(faktor),
     gaji_pokok,

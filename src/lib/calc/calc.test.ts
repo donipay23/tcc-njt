@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyTiers, cekBatasMingguan, dasarUpahLembur, hitungJamHarian, jamKerjaBersih, upahLembur, upahPerJam } from "./overtime";
-import { faktorProrata, hitungPayroll } from "./payroll";
+import { faktorProrata, hitungPayroll, rekapDariHari } from "./payroll";
 import { agingBucket, hitungPajakInvoice, rateBerlaku, susunBarisTagihan } from "./invoice";
 import { DEFAULT_OVERTIME, DEFAULT_SETTINGS, mergeSettings } from "./settings";
 
@@ -99,7 +99,7 @@ describe("Payroll", () => {
 
   it("gaji penuh + lembur + BPJS", () => {
     const r = hitungPayroll(
-      { periode, karyawan: { tanggal_masuk: "2026-01-01" }, gaji_pokok: 5_000_000, basis_gaji: "bulanan", tunjangan: [], hari },
+      { periode, karyawan: { tanggal_masuk: "2026-01-01" }, gaji_pokok: 5_000_000, basis_gaji: "bulanan", tunjangan: [], rekap: rekapDariHari(hari) },
       DEFAULT_SETTINGS,
     );
     expect(r.gaji_pokok).toBe(5_000_000);
@@ -134,7 +134,7 @@ describe("Payroll", () => {
         gaji_pokok: 3_000_000,
         basis_gaji: "bulanan",
         tunjangan: [{ nama: "Makan", jenis: "tidak_tetap", basis: "harian", jumlah: 100_000 }],
-        hari,
+        rekap: rekapDariHari(hari),
       },
       DEFAULT_SETTINGS,
     );
