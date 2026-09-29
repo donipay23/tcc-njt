@@ -9,6 +9,7 @@ import { Badge, Card, Flash, Kpi, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { ExportButtons } from "@/components/export-buttons";
 import { SlipButton } from "@/components/slip-button";
+import { labelPph21 } from "@/lib/pph21-label";
 import { bukaPeriode, hitungPeriode, kunciPeriode, ubahPotongan } from "../actions";
 
 export const metadata = { title: "Detail payroll" };
@@ -46,6 +47,7 @@ export default async function PayrollDetail({ params, searchParams }: { params: 
         rekening: c.no_rekening ?? "",
         nama_rekening: c.nama_rekening ?? "",
         tunjangan: Number(r.tunjangan_tetap) + Number(r.tunjangan_tidak_tetap),
+        status_ptkp: r.detail?.pph21?.status_ptkp ?? "",
         bpjs_kes_p: r.bpjs_perusahaan?.kes, bpjs_jkk: r.bpjs_perusahaan?.jkk, bpjs_jkm: r.bpjs_perusahaan?.jkm,
         bpjs_jht_p: r.bpjs_perusahaan?.jht, bpjs_jp_p: r.bpjs_perusahaan?.jp,
       };
@@ -97,7 +99,7 @@ export default async function PayrollDetail({ params, searchParams }: { params: 
                 { key: "bpjs_kes_p", label: "BPJS Kes (P)", type: "rupiah" }, { key: "bpjs_jkk", label: "JKK", type: "rupiah" }, { key: "bpjs_jkm", label: "JKM", type: "rupiah" },
                 { key: "bpjs_jht_p", label: "JHT (P)", type: "rupiah" }, { key: "bpjs_jp_p", label: "JP (P)", type: "rupiah" },
                 { key: "bpjs_karyawan_total", label: "BPJS karyawan", type: "rupiah" }, { key: "thr_cadangan", label: "Cadangan THR", type: "rupiah" },
-                { key: "kompensasi_cadangan", label: "Cadangan kompensasi PKWT", type: "rupiah" }, { key: "pph21", label: "PPh 21", type: "rupiah" },
+                { key: "kompensasi_cadangan", label: "Cadangan kompensasi PKWT", type: "rupiah" }, { key: "status_ptkp", label: "PTKP" }, { key: "pph21_metode", label: "Metode PPh 21" }, { key: "bruto_pph21", label: "Bruto PPh 21", type: "rupiah" }, { key: "tunjangan_pph", label: "Tunjangan PPh", type: "rupiah" }, { key: "pph21", label: "PPh 21", type: "rupiah" },
                 { key: "potongan_lain", label: "Potongan lain", type: "rupiah" }, { key: "take_home_pay", label: "Take home pay", type: "rupiah" },
                 { key: "biaya_perusahaan", label: "Biaya perusahaan", type: "rupiah" },
               ]}
@@ -141,7 +143,8 @@ export default async function PayrollDetail({ params, searchParams }: { params: 
                   <th className="th num">Lembur</th>
                   <th className="th num">BPJS (P / K)</th>
                   <th className="th num">THR + Komp.</th>
-                  <th className="th">PPh 21 / Potongan</th>
+                  <th className="th num">PPh 21</th>
+                  <th className="th">Potongan lain</th>
                   <th className="th num">THP</th>
                   <th className="th num">Biaya</th>
                   <th className="th"></th>
@@ -158,14 +161,18 @@ export default async function PayrollDetail({ params, searchParams }: { params: 
                     <td className="td num">{rupiah(r.upah_lembur)}<div className="text-xs text-gray-500">{rupiah(r.upah_per_jam)}/j</div></td>
                     <td className="td num">{rupiah(r.bpjs_perusahaan_total)}<div className="text-xs text-gray-500">{rupiah(r.bpjs_karyawan_total)}</div></td>
                     <td className="td num">{rupiah(Number(r.thr_cadangan) + Number(r.kompensasi_cadangan))}</td>
+                    <td className="td num">
+                      {rupiah(r.pph21)}
+                      {Number(r.tunjangan_pph) > 0 && <div className="text-xs text-gray-500">tunj. {rupiah(r.tunjangan_pph)}</div>}
+                      <div className="text-xs text-gray-500">{labelPph21(r).replace(/^PPh 21 ?/, "")}</div>
+                    </td>
                     <td className="td">
                       {locked ? (
-                        <span className="text-xs">{rupiah(r.pph21)} / {rupiah(r.potongan_lain)}</span>
+                        <span className="text-xs">{rupiah(r.potongan_lain)}</span>
                       ) : (
                         <form action={ubahPotongan} className="flex gap-1">
                           <input type="hidden" name="period_id" value={id} />
                           <input type="hidden" name="id" value={r.id} />
-                          <input name="pph21" type="number" defaultValue={Number(r.pph21) || ""} placeholder="PPh21" className="input w-24 px-2 py-1 text-xs" />
                           <input name="potongan_lain" type="number" defaultValue={Number(r.potongan_lain) || ""} placeholder="Kasbon" className="input w-24 px-2 py-1 text-xs" />
                           <input name="potongan_keterangan" defaultValue={r.potongan_keterangan ?? ""} placeholder="Ket." className="input w-24 px-2 py-1 text-xs" />
                           <SubmitButton className="btn-secondary btn-sm">OK</SubmitButton>
@@ -189,7 +196,7 @@ export default async function PayrollDetail({ params, searchParams }: { params: 
         )}
       </Card>
       <p className="mt-2 text-xs text-gray-500">
-        PPh 21 diisi manual per karyawan (mode diatur di Pengaturan: tidak dihitung / ditanggung perusahaan / dipotong karyawan). Hanya timesheet berstatus approved yang dihitung. Setelah dikunci, angka menjadi snapshot dan tidak berubah walau gaji/rate diubah kemudian.
+        PPh 21 dihitung otomatis: TER bulanan (PP 58/2023) untuk Jan–Nov, dan tarif Pasal 17 setahun dikurangi potongan sebelumnya pada Desember atau bulan terakhir bekerja. Status PTKP diambil dari data karyawan (kosong = TK/0). Mode (tidak dihitung / ditanggung perusahaan / dipotong karyawan / gross-up) diatur di Pengaturan. Hanya timesheet berstatus approved yang dihitung. Setelah dikunci, angka menjadi snapshot dan tidak berubah walau gaji/rate diubah kemudian.
       </p>
     </>
   );

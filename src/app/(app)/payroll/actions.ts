@@ -31,15 +31,34 @@ export async function hitungPeriode(form: FormData) {
   if (!p) back(id, "Periode tidak ditemukan", "err");
   if (p!.status === "locked") back(id, "Periode sudah dikunci", "err");
 
-  const [emps, rekap, comps, allows, existing] = await Promise.all([
+  const tahun = p!.selesai.slice(0, 4);
+  const [emps, rekap, comps, allows, existing, prior] = await Promise.all([
     fetchAll((a, b) =>
-      supabase.from("employees").select("id, tanggal_masuk, tanggal_keluar, classification_id, team_id, area_id").lte("tanggal_masuk", p!.selesai).or(`tanggal_keluar.is.null,tanggal_keluar.gte.${p!.mulai}`).range(a, b),
+      supabase.from("employees").select("id, tanggal_masuk, tanggal_keluar, jenis_kontrak, classification_id, team_id, area_id").lte("tanggal_masuk", p!.selesai).or(`tanggal_keluar.is.null,tanggal_keluar.gte.${p!.mulai}`).range(a, b),
     ),
     fetchAll((a, b) => supabase.rpc("rekap_timesheet", { p_mulai: p!.mulai, p_selesai: p!.selesai, p_hanya_approved: true }).range(a, b)),
-    fetchAll((a, b) => supabase.from("employee_compensation").select("employee_id, basis_gaji, gaji_pokok").range(a, b)),
+    fetchAll((a, b) => supabase.from("employee_compensation").select("employee_id, basis_gaji, gaji_pokok, status_ptkp").range(a, b)),
     fetchAll((a, b) => supabase.from("employee_allowances").select("employee_id, nama, jenis, basis, jumlah").range(a, b)),
     fetchAll((a, b) => supabase.from("payroll").select("employee_id, pph21, potongan_lain, potongan_keterangan").eq("period_id", id).range(a, b)),
+    // Masa-masa sebelumnya di tahun pajak yang sama (untuk perhitungan PPh 21 masa terakhir)
+    fetchAll((a, b) =>
+      supabase
+        .from("payroll")
+        .select("employee_id, bruto_pph21, iuran_pegawai_pph21, pph21, payroll_periods!inner(selesai)")
+        .gte("payroll_periods.selesai", `${tahun}-01-01`)
+        .lt("payroll_periods.selesai", p!.selesai)
+        .range(a, b),
+    ),
   ]);
+  const priorMap = new Map<string, { bruto: number; iuran_pegawai: number; pph21: number; bulan: number }>();
+  for (const x of prior as any[]) {
+    const v = priorMap.get(x.employee_id) ?? { bruto: 0, iuran_pegawai: 0, pph21: 0, bulan: 0 };
+    v.bruto += Number(x.bruto_pph21);
+    v.iuran_pegawai += Number(x.iuran_pegawai_pph21);
+    v.pph21 += Number(x.pph21);
+    v.bulan += 1;
+    priorMap.set(x.employee_id, v);
+  }
   const rekapMap = new Map((rekap as any[]).map((r) => [r.employee_id, r]));
   const compMap = new Map((comps as any[]).map((c) => [c.employee_id, c]));
   const exMap = new Map((existing as any[]).map((x) => [x.employee_id, x]));
@@ -71,7 +90,14 @@ export async function hitungPeriode(form: FormData) {
           jam_lembur: Number(r?.jam_lembur ?? 0),
           jam_konversi: Number(r?.jam_konversi ?? 0),
         },
-        pph21: Number(ex?.pph21 ?? 0),
+        pajak: {
+          status_ptkp: c?.status_ptkp,
+          // PKWT dengan upah rutin = pegawai tetap (TER + Pasal 17 setahun di masa terakhir); Harian = pegawai tidak tetap
+          pegawai_tetap: e.jenis_kontrak !== "Harian",
+          // Masa terakhir: Desember, atau bulan karyawan berhenti bekerja
+          masa_terakhir: p!.selesai.slice(5, 7) === "12" || (!!e.tanggal_keluar && e.tanggal_keluar >= p!.mulai && e.tanggal_keluar <= p!.selesai),
+          sebelumnya: priorMap.get(e.id),
+        },
         potongan_lain: Number(ex?.potongan_lain ?? 0),
       },
       settings,
@@ -103,6 +129,10 @@ export async function hitungPeriode(form: FormData) {
       bpjs_karyawan_total: res.bpjs_karyawan.total,
       thr_cadangan: res.thr_cadangan,
       kompensasi_cadangan: res.kompensasi_cadangan,
+      bruto_pph21: res.bruto_pph21,
+      iuran_pegawai_pph21: res.iuran_pegawai_pph21,
+      tunjangan_pph: res.tunjangan_pph,
+      pph21_metode: res.pph21_detail?.metode ?? null,
       pph21: res.pph21,
       potongan_lain: res.potongan_lain,
       potongan_keterangan: ex?.potongan_keterangan ?? null,
@@ -112,6 +142,7 @@ export async function hitungPeriode(form: FormData) {
         tunjangan: tunj,
         gaji_pokok_input: Number(c?.gaji_pokok ?? 0),
         pph21_mode: settings.payroll.pph21_mode,
+        pph21: res.pph21_detail,
         prorata_metode: settings.payroll.prorata_metode,
         bpjs: settings.bpjs,
         lembur: { pembagi: settings.lembur.pembagi_upah_jam },
@@ -139,7 +170,6 @@ export async function ubahPotongan(form: FormData) {
   const { error } = await supabase
     .from("payroll")
     .update({
-      pph21: Number(form.get("pph21")) || 0,
       potongan_lain: Number(form.get("potongan_lain")) || 0,
       potongan_keterangan: String(form.get("potongan_keterangan") ?? "") || null,
     })

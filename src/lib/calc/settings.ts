@@ -1,3 +1,4 @@
+import { PASAL17, TER_A, TER_B, TER_C } from "./pph21";
 /**
  * Parameter perhitungan. Nilai default mengikuti Kepmenakertrans KEP-102/MEN/VI/2004
  * jo. PP 35/2021 dan tarif BPJS yang umum berlaku. Nilai sebenarnya dibaca dari tabel
@@ -48,7 +49,20 @@ export interface BpjsSettings {
 }
 
 export type ProrataMetode = "hari_kerja" | "kalender_30";
-export type Pph21Mode = "tidak_dihitung" | "ditanggung_perusahaan" | "dipotong_karyawan";
+export type Pph21Mode = "tidak_dihitung" | "ditanggung_perusahaan" | "dipotong_karyawan" | "gross_up";
+
+/** Parameter PPh 21 (PP 58/2023, PMK 168/2023, UU HPP). */
+export interface Pph21Settings {
+  ptkp_dasar: number; // 54.000.000
+  ptkp_kawin: number; // 4.500.000
+  ptkp_tanggungan: number; // 4.500.000 per tanggungan (maks. 3)
+  biaya_jabatan_persen: number; // 0.05
+  biaya_jabatan_maks_bulan: number; // 500.000 per bulan (6 jt setahun)
+  /** Tabel TER bulanan kategori A/B/C: [batas atas bruto, tarif %]. */
+  ter: Record<"A" | "B" | "C", [number | null, number][]>;
+  /** Lapisan tarif Pasal 17: [batas atas PKP, tarif %]. */
+  pasal17: [number | null, number][];
+}
 
 export interface PayrollSettings {
   prorata_metode: ProrataMetode;
@@ -69,6 +83,7 @@ export interface TaxSettings {
 
 export interface AppSettings {
   lembur: OvertimeSettings;
+  pph21: Pph21Settings;
   bpjs: BpjsSettings;
   payroll: PayrollSettings;
   pajak: TaxSettings;
@@ -124,8 +139,19 @@ export const DEFAULT_TAX: TaxSettings = {
   termin_hari: 30,
 };
 
+export const DEFAULT_PPH21: Pph21Settings = {
+  ptkp_dasar: 54_000_000,
+  ptkp_kawin: 4_500_000,
+  ptkp_tanggungan: 4_500_000,
+  biaya_jabatan_persen: 0.05,
+  biaya_jabatan_maks_bulan: 500_000,
+  ter: { A: TER_A, B: TER_B, C: TER_C },
+  pasal17: PASAL17,
+};
+
 export const DEFAULT_SETTINGS: AppSettings = {
   lembur: DEFAULT_OVERTIME,
+  pph21: DEFAULT_PPH21,
   bpjs: DEFAULT_BPJS,
   payroll: DEFAULT_PAYROLL,
   pajak: DEFAULT_TAX,
@@ -150,6 +176,7 @@ export function mergeSettings(rows: { key: string; value: unknown }[] | null | u
   };
   return {
     lembur: obj("lembur", DEFAULT_OVERTIME),
+    pph21: obj("pph21", DEFAULT_PPH21),
     bpjs: obj("bpjs", DEFAULT_BPJS),
     payroll: obj("payroll", DEFAULT_PAYROLL),
     pajak: obj("pajak", DEFAULT_TAX),

@@ -28,6 +28,7 @@ async function simpan(form: FormData) {
   await requireRole("super_admin");
   const supabase = await createClient();
   const group = String(form.get("group"));
+  const s0 = await getSettings();
   let rows: { key: string; value: unknown }[] = [];
   try {
     if (group === "lembur") {
@@ -79,6 +80,18 @@ async function simpan(form: FormData) {
         { key: "target_margin", value: pct(form, "target_margin") },
         { key: "admin_akses_keuangan", value: form.get("admin_akses_keuangan") === "on" },
       ];
+    } else if (group === "pph21") {
+      rows = [{
+        key: "pph21",
+        value: {
+          ...(s0.raw.pph21 ?? {}),
+          ptkp_dasar: n(form, "ptkp_dasar"),
+          ptkp_kawin: n(form, "ptkp_kawin"),
+          ptkp_tanggungan: n(form, "ptkp_tanggungan"),
+          biaya_jabatan_persen: pct(form, "biaya_jabatan_persen"),
+          biaya_jabatan_maks_bulan: n(form, "biaya_jabatan_maks_bulan"),
+        },
+      }];
     } else if (group === "perusahaan") {
       rows = [{ key: "perusahaan", value: { nama: form.get("nama"), klien: form.get("klien"), no_kontrak: form.get("no_kontrak"), domain_email_karyawan: form.get("domain_email_karyawan") } }];
     }
@@ -206,11 +219,30 @@ export default async function Pengaturan({ searchParams }: { searchParams: Promi
                 <option value="tidak_dihitung">Tidak dihitung</option>
                 <option value="ditanggung_perusahaan">Ditanggung perusahaan</option>
                 <option value="dipotong_karyawan">Dipotong dari karyawan</option>
+                <option value="gross_up">Gross-up (tunjangan PPh)</option>
               </select>
             </Field>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="thr_cadangan" defaultChecked={s.payroll.thr_cadangan} /> Cadangan THR (1/12 upah)</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="kompensasi_pkwt_cadangan" defaultChecked={s.payroll.kompensasi_pkwt_cadangan} /> Cadangan kompensasi PKWT</label>
             <SubmitButton>Simpan</SubmitButton>
+          </form>
+        </Card>
+
+        <Card title="PPh 21 (TER PP 58/2023 & PMK 168/2023)">
+          <form action={simpan} id="pph21" className="grid grid-cols-2 items-end gap-3 md:grid-cols-6">
+            <input type="hidden" name="group" value="pph21" />
+            <Num name="ptkp_dasar" label="PTKP wajib pajak (Rp/th)" v={s.pph21.ptkp_dasar} />
+            <Num name="ptkp_kawin" label="Tambahan kawin (Rp/th)" v={s.pph21.ptkp_kawin} />
+            <Num name="ptkp_tanggungan" label="Per tanggungan, maks. 3 (Rp/th)" v={s.pph21.ptkp_tanggungan} />
+            <Num name="biaya_jabatan_persen" label="Biaya jabatan (%)" v={x100(s.pph21.biaya_jabatan_persen)} />
+            <Num name="biaya_jabatan_maks_bulan" label="Maks. biaya jabatan / bulan" v={s.pph21.biaya_jabatan_maks_bulan} />
+            <SubmitButton>Simpan</SubmitButton>
+            <p className="col-span-2 text-xs text-gray-500 md:col-span-6">
+              Jan–Nov: TER bulanan × bruto (kategori A: TK/0, TK/1, K/0 · B: TK/2, TK/3, K/1, K/2 · C: K/3). Desember atau bulan terakhir bekerja: PPh setahun
+              tarif Pasal 17 atas PKP dikurangi PPh yang sudah dipotong. Bruto termasuk premi BPJS Kesehatan, JKK & JKM yang dibayar perusahaan; iuran JHT & JP
+              karyawan menjadi pengurang. Tabel TER ({s.pph21.ter.A.length}/{s.pph21.ter.B.length}/{s.pph21.ter.C.length} lapisan) dan lapisan Pasal 17 tersimpan di
+              pengaturan <code>pph21</code> dan dapat diperbarui bila regulasi berubah.
+            </p>
           </form>
         </Card>
 
