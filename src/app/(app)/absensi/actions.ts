@@ -100,3 +100,42 @@ export async function approvePilihan(form: FormData) {
   revalidatePath("/absensi");
   redirect(backUrl(form, `${ids.length} timesheet ${aksi === "reject" ? "ditolak" : "di-approve"}`, "ok"));
 }
+
+/**
+ * Koreksi timesheet yang sudah di-approve — hanya Super Admin (juga dijaga trigger database).
+ * Status tetap approved; jam dihitung ulang oleh trigger, alasan disimpan di catatan_approval,
+ * dan perubahan tercatat di audit log atas nama Super Admin.
+ */
+export async function koreksiTimesheet(form: FormData) {
+  await requireRole("super_admin");
+  const id = String(form.get("id"));
+  const back = (key: "ok" | "err", msg: string) => redirect(`/absensi/koreksi/${id}?${key}=${encodeURIComponent(msg)}`);
+  const alasan = String(form.get("alasan") ?? "").trim();
+  const status = String(form.get("status_kehadiran"));
+  const masuk = String(form.get("jam_masuk") ?? "");
+  const keluar = String(form.get("jam_keluar") ?? "");
+  if (alasan.length < 5) back("err", "Isi alasan koreksi (minimal 5 karakter)");
+  if (!STATUS.includes(status)) back("err", "Status kehadiran tidak valid");
+  const hadir = status === "hadir";
+  if (hadir && (!TIME.test(masuk) || !TIME.test(keluar))) back("err", "Jam masuk dan keluar wajib diisi (HH:MM) untuk status Hadir");
+
+  const supabase = await createClient();
+  const { data: ts } = await supabase.from("timesheets").select("approval_status").eq("id", id).maybeSingle();
+  if (!ts) back("err", "Timesheet tidak ditemukan");
+  if (ts!.approval_status !== "approved") back("err", "Hanya timesheet yang sudah di-approve yang dikoreksi di sini; lainnya lewat Input Absensi");
+
+  const { error } = await supabase
+    .from("timesheets")
+    .update({
+      status_kehadiran: status,
+      jam_masuk: hadir ? masuk : null,
+      jam_keluar: hadir ? keluar : null,
+      lokasi: String(form.get("lokasi") ?? "").slice(0, 200) || null,
+      keterangan: String(form.get("keterangan") ?? "").slice(0, 500) || null,
+      catatan_approval: `Koreksi Super Admin: ${alasan.slice(0, 300)}`,
+    })
+    .eq("id", id);
+  if (error) back("err", error.message);
+  revalidatePath("/absensi");
+  back("ok", "Koreksi disimpan. Jam dihitung ulang dan tercatat di audit log.");
+}

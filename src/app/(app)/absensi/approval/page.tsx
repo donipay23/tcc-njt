@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { getPerusahaan, requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -13,7 +14,7 @@ export const metadata = { title: "Approval timesheet" };
 const LIMIT = 300;
 
 export default async function Approval({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  await requireRole("super_admin", "admin");
+  const sess = await requireRole("super_admin", "admin");
   const sp = await searchParams;
   const p = await getPerusahaan();
   const { mulai, selesai } = rentangDariParams(sp, p.tanggal_mulai_periode);
@@ -138,6 +139,9 @@ export default async function Approval({ searchParams }: { searchParams: Promise
                     <tr key={r.id} className={r.peringatan?.length ? "bg-amber-50/60" : ""}>
                       <td className="td">
                         {r.approval_status !== "approved" && <input type="checkbox" name="ids" value={r.id} defaultChecked={r.approval_status === "submitted" && !r.peringatan?.length} className="h-4 w-4" />}
+                        {r.approval_status === "approved" && sess.isSuperAdmin && (
+                          <Link href={`/absensi/koreksi/${r.id}`} className="text-xs font-medium text-brand-700 hover:underline" title="Koreksi timesheet yang sudah di-approve">Koreksi</Link>
+                        )}
                       </td>
                       <td className="td">
                         {tanggal(r.tanggal)} {r.tipe_hari === "libur" && <Badge tone="purple">Libur</Badge>}
