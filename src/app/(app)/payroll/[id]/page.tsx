@@ -117,7 +117,7 @@ export default async function PayrollDetail({ params, searchParams }: { params: 
           <AlertTriangle size={16} /> {pending.count} timesheet di periode ini belum di-approve dan TIDAK ikut dihitung. Approve dulu di menu Approval.
         </div>
       )}
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Kpi label="Karyawan" value={data.length} />
         <Kpi label="Gaji + tunjangan" value={rupiah(sum("gaji_pokok") + sum("tunjangan"))} />
         <Kpi label="Upah lembur" value={rupiah(sum("upah_lembur"))} hint={`${angka(sum("jam_konversi"))} jam konversi`} />

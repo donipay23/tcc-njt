@@ -44,7 +44,7 @@ export function Kpi({ label, value, hint, tone = "default", href }: {
   const body = (
     <div className="card h-full p-3 sm:p-4">
       <div className="text-xs font-medium text-gray-500">{label}</div>
-      <div className={`mt-1 text-lg font-semibold tabular-nums sm:text-xl ${toneCls}`}>{value}</div>
+      <div className={`mt-1 text-lg font-semibold tabular-nums ${toneCls}`}>{value}</div>
       {hint && <div className="mt-0.5 text-xs text-gray-500">{hint}</div>}
     </div>
   );

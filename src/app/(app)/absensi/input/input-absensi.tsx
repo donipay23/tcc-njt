@@ -101,10 +101,10 @@ export function InputAbsensi({ tanggal, regu, teams, employees, existing, lembur
             <button type="button" className="btn-secondary px-2" onClick={() => go({ tanggal: tambahHari(tanggal, 1) })}>›</button>
           </div>
         </label>
-        <div className="col-span-2 flex items-end gap-2">
-          <label className="flex-1"><span className="label">Masuk (semua)</span><input type="time" value={masukAll} onChange={(e) => setMasukAll(e.target.value)} className="input" /></label>
-          <label className="flex-1"><span className="label">Keluar (semua)</span><input type="time" value={keluarAll} onChange={(e) => setKeluarAll(e.target.value)} className="input" /></label>
-          <button type="button" onClick={terapkanSemua} className="btn-secondary">Terapkan</button>
+        <div className="col-span-2 grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
+          <label className="min-w-0"><span className="label">Masuk (semua)</span><input type="time" value={masukAll} onChange={(e) => setMasukAll(e.target.value)} className="input min-w-0" /></label>
+          <label className="min-w-0"><span className="label">Keluar (semua)</span><input type="time" value={keluarAll} onChange={(e) => setKeluarAll(e.target.value)} className="input min-w-0" /></label>
+          <button type="button" onClick={terapkanSemua} className="btn-secondary col-span-2 sm:col-span-1">Terapkan ke semua yang hadir</button>
         </div>
       </div>
 

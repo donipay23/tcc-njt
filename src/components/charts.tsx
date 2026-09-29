@@ -45,13 +45,13 @@ export function BarChartCard({ data, x, series, format = "angka", height = 260, 
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
         {horizontal ? (
           <>
-            <XAxis type="number" tickFormatter={axisFn(format)} fontSize={11} />
+            <XAxis type="number" tickFormatter={axisFn(format)} fontSize={11} allowDecimals={format === "rupiah"} />
             <YAxis type="category" dataKey={x} width={110} fontSize={11} />
           </>
         ) : (
           <>
             <XAxis dataKey={x} fontSize={11} />
-            <YAxis tickFormatter={axisFn(format)} fontSize={11} width={format === "rupiah" ? 70 : 40} />
+            <YAxis tickFormatter={axisFn(format)} fontSize={11} width={format === "rupiah" ? 70 : 40} allowDecimals={format === "rupiah"} />
           </>
         )}
         <Tooltip formatter={(v) => fmtFn(format)(Number(v))} />
@@ -77,7 +77,7 @@ export function LineChartCard({ data, x, series, format = "angka", height = 260 
       <LineChart data={data} margin={{ right: 8, top: 8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
         <XAxis dataKey={x} fontSize={11} />
-        <YAxis tickFormatter={axisFn(format)} fontSize={11} width={format === "rupiah" ? 70 : 40} />
+        <YAxis tickFormatter={axisFn(format)} fontSize={11} width={format === "rupiah" ? 70 : 40} allowDecimals={format === "rupiah"} />
         <Tooltip formatter={(v) => fmtFn(format)(Number(v))} />
         <Legend wrapperStyle={{ fontSize: 12 }} />
         {series.map((s, i) => (

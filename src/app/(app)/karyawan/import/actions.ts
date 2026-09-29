@@ -28,11 +28,15 @@ function cellValue(v: ExcelJS.CellValue): string {
 /** Menerima DD/MM/YYYY, YYYY-MM-DD, atau tanggal Excel. */
 function parseTanggal(v: string): string | null | "invalid" {
   if (!v) return null;
+  let iso: string | null = null;
   let m = v.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  if (m) iso = `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
   m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  return "invalid";
+  if (m) iso = `${m[1]}-${m[2]}-${m[3]}`;
+  // tolak tanggal yang tidak ada di kalender (mis. 31/02 atau bulan 13)
+  const d = iso ? new Date(iso + "T00:00:00Z") : null;
+  if (!d || isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso) return "invalid";
+  return iso;
 }
 
 export async function importKaryawan(_: ImportResult | null, form: FormData): Promise<ImportResult> {
