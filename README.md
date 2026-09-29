@@ -161,7 +161,11 @@ di kemudian hari tidak mengubah laporan periode yang sudah dikunci.
 ## 6. Catatan operasional
 
 - **Import besar**: import ±200 baris per file bila sekaligus membuat akun login (pembuatan akun dilakukan per baris).
-- **Offline mode** (fase 2) belum tersedia; service worker saat ini hanya meng-cache aset agar aplikasi cepat terbuka.
+- **Mode offline input absensi**: setelah halaman *Input Absensi* pernah dibuka online, halaman itu bisa dibuka tanpa sinyal
+  (service worker). Ganti tanggal/regu, isi jam, dan Simpan tetap berjalan; data disimpan di HP (IndexedDB, per akun) dan
+  dikirim otomatis saat online (juga dicoba tiap 1 menit). Indikator di header menampilkan jumlah antrean. Timesheet yang
+  keburu di-approve di server tidak ditimpa. Data hasil sinkron diberi tanda *offline* + waktu input di halaman Approval.
+  Logout menghapus halaman ter-cache (antrean tetap tersimpan untuk akun yang sama). Menu lain tetap butuh sinyal.
 - **Backup mandiri** (opsional, di luar backup Supabase): `pg_dump "$SUPABASE_DB_URL" -Fc -f backup-$(date +%F).dump` terjadwal harian.
 - Mesin absensi fingerprint: belum terintegrasi; data dapat dimasukkan lewat input massal per regu.
 

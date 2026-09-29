@@ -2,7 +2,8 @@ import { getSession, getSettings } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { hariIni, tambahHari } from "@/lib/format";
 import { Flash, PageHeader } from "@/components/ui";
-import { InputAbsensi } from "./input-absensi";
+import { fetchAll } from "@/lib/fetch-all";
+import { InputAbsensi, type Emp } from "./input-absensi";
 
 export const metadata = { title: "Input absensi" };
 
@@ -19,18 +20,25 @@ export default async function InputPage({ searchParams }: { searchParams: Promis
   const { data: teams } = await tq;
   const regu = sp.regu && teams?.some((t) => t.id === sp.regu) ? sp.regu : teams?.[0]?.id;
 
+  const teamIds = (teams ?? []).map((t) => t.id);
+  const today = hariIni();
   const [emps, ts, hol] = await Promise.all([
-    regu
-      ? supabase.from("employees").select("id, nik, nama, status, classification_id, classifications(nama)").eq("team_id", regu).in("status", ["aktif", "cuti"]).order("nama")
-      : Promise.resolve({ data: [] as any[] }),
+    // Anggota SEMUA regu user: ikut ter-cache di HP sehingga bisa ganti regu saat offline
+    teamIds.length
+      ? fetchAll((a, b) => supabase.from("employees").select("id, nik, nama, status, team_id, classifications(nama)").in("team_id", teamIds).in("status", ["aktif", "cuti"]).order("nama").range(a, b))
+      : Promise.resolve([] as any[]),
     regu ? supabase.from("timesheets").select("*").eq("tanggal", tanggal) : Promise.resolve({ data: [] as any[] }),
-    supabase.from("holidays").select("tanggal, nama").gte("tanggal", tambahHari(tanggal, -7)).lte("tanggal", tambahHari(tanggal, 7)),
+    // Rentang libur cukup lebar agar kalender tetap benar saat offline beberapa minggu
+    supabase.from("holidays").select("tanggal, nama").gte("tanggal", tambahHari(tanggal < today ? tanggal : today, -90)).lte("tanggal", tambahHari(tanggal > today ? tanggal : today, 90)),
   ]);
 
-  const existing = Object.fromEntries(((ts.data as any[]) ?? []).map((t) => [t.employee_id, t]));
+  const roster: Record<string, Emp[]> = Object.fromEntries(teamIds.map((id) => [id, [] as Emp[]]));
+  for (const e of emps as any[]) roster[e.team_id]?.push({ id: e.id, nik: e.nik, nama: e.nama, status: e.status, klasifikasi: e.classifications?.nama ?? "-" });
+  const members = new Set((roster[regu ?? ""] ?? []).map((e) => e.id));
+  const existing = Object.fromEntries(((ts.data as any[]) ?? []).filter((t) => members.has(t.employee_id)).map((t) => [t.employee_id, t]));
   return (
     <>
-      <PageHeader title="Input absensi harian" subtitle="Pilih regu → centang hadir → isi jam → simpan. Jam lembur & konversi dihitung otomatis." />
+      <PageHeader title="Input absensi harian" subtitle="Pilih regu → centang hadir → isi jam → simpan. Jam lembur & konversi dihitung otomatis. Bisa dipakai tanpa sinyal; data dikirim saat online." />
       <Flash sp={sp} />
       {!teams?.length ? (
         <div className="card p-6 text-sm text-gray-600">Anda belum ditugaskan sebagai supervisor pada regu mana pun. Hubungi Admin.</div>
@@ -39,12 +47,12 @@ export default async function InputPage({ searchParams }: { searchParams: Promis
           key={`${regu}-${tanggal}`}
           tanggal={tanggal}
           regu={regu!}
+          userId={s.userId}
           teams={teams}
-          employees={((emps.data as any[]) ?? []).map((e) => ({ id: e.id, nik: e.nik, nama: e.nama, status: e.status, klasifikasi: e.classifications?.nama ?? "-" }))}
+          roster={roster}
           existing={existing}
           lembur={settings.lembur}
-          holidays={((hol.data as any[]) ?? []).map((h) => h.tanggal)}
-          namaLibur={((hol.data as any[]) ?? []).find((h) => h.tanggal === tanggal)?.nama ?? null}
+          holidays={((hol.data as any[]) ?? []).map((h) => ({ tanggal: h.tanggal, nama: h.nama }))}
         />
       )}
     </>

@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { LogOut } from "lucide-react";
 import { getPerusahaan, getSession } from "@/lib/auth";
 import { navFor } from "@/lib/nav";
 import { ROLE_LABEL } from "@/lib/types";
 import { BottomNav, Sidebar } from "@/components/app-nav";
+import { LogoutButton } from "@/components/logout-button";
+import { OfflineSync } from "@/components/offline-sync";
 import { logout } from "../login/actions";
 
 export const dynamic = "force-dynamic";
@@ -33,15 +34,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="truncate text-xs text-gray-500 lg:hidden">Soda Ash Bontang</div>
           </div>
           <div className="flex items-center gap-3">
+            {s.role !== "karyawan" && <OfflineSync userId={s.userId} />}
             <div className="text-right">
               <div className="max-w-36 truncate text-sm font-medium">{s.profile.full_name}</div>
               <div className="text-xs text-gray-500">{ROLE_LABEL[s.role]}</div>
             </div>
-            <form action={logout}>
-              <button className="rounded-lg p-2 text-gray-500 hover:bg-gray-100" title="Keluar" aria-label="Keluar">
-                <LogOut size={18} />
-              </button>
-            </form>
+            <LogoutButton userId={s.userId} action={logout} />
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-3 py-4 pb-24 sm:px-6 lg:pb-8">{children}</main>
