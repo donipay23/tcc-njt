@@ -128,7 +128,7 @@ npm run test:db               # migrasi + uji RLS/trigger di PostgreSQL lokal (b
 
 1. **Admin**: isi Pengaturan (identitas proyek, cut-off, BPJS/JKK, PPN, target margin), hari libur, klasifikasi & rate, area, regu (+ user supervisor), lalu import karyawan.
 2. **Supervisor** (HP): menu *Input Absensi* → pilih regu & tanggal → set jam → Simpan. Status otomatis *Menunggu approval*.
-3. **Admin**: *Approval* → cek peringatan → Approve (per baris / massal). Approved = terkunci.
+3. **Admin**: *Approval* → cek peringatan → Approve (per baris / massal). Approved = terkunci. Koreksi atas timesheet approved hanya oleh **Super Admin** lewat tombol *Koreksi* di halaman Approval (alasan wajib; jam dihitung ulang, tercatat di audit log; bila payroll periode itu sudah dikunci, buka kunci → hitung ulang → kunci lagi).
 4. Akhir periode: *Payroll* → buat periode → Hitung → isi PPh 21/kasbon bila perlu → **Kunci periode** → karyawan bisa unduh slip. Catat transfer gaji di *Arus Kas* (pilih periode → rekonsiliasi).
 5. *Invoice* → buat draft dari periode → export lampiran → Tandai terkirim → catat pembayaran.
 6. Pantau *Dashboard*, *Profit*, *Arus Kas*.
